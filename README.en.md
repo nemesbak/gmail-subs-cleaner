@@ -59,6 +59,12 @@ var CONFIG = {
 - A one-click unsubscribe can confirm to a dubious sender that your address exists. Set
   `UNSUBSCRIBE: false` to send everything straight to Spam instead.
 
+## What to expect in the log
+
+- `[prueba] ...`: dry-run mode (`DRY_RUN: true`), nothing is touched.
+- `respuesta de la baja: HTTP 200`: the sender accepted the unsubscribe.
+- `respuesta de la baja: HTTP 302`: the sender redirects to a confirmation page. The script deliberately does not follow redirects, so it cannot confirm the unsubscribe; it is usually accepted. If you keep getting mail from that sender it goes to Spam anyway.
+
 ## Credits and thanks
 
 The idea of **unsubscribing from newsletters in Gmail through a label and Google Apps Script**

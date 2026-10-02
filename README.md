@@ -59,6 +59,12 @@ var CONFIG = {
 - La baja de un clic puede confirmar a un remitente dudoso que tu dirección existe. Si prefieres
   no hacerlo, pon `UNSUBSCRIBE: false` y todo irá solo a Spam.
 
+## Qué esperar en el registro
+
+- `[prueba] ...`: modo prueba (`DRY_RUN: true`), no se toca nada.
+- `respuesta de la baja: HTTP 200`: el remitente aceptó la baja.
+- `respuesta de la baja: HTTP 302`: el remitente redirige a una página de confirmación. El script no sigue redirecciones a propósito, así que no se puede confirmar la baja; suele estar aceptada. Si sigues recibiendo correo de ese remitente, ya va a Spam igualmente.
+
 ## Créditos y agradecimientos
 
 La idea de **darse de baja de boletines desde Gmail con una etiqueta y Google Apps Script** viene del
