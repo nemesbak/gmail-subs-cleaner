@@ -78,7 +78,7 @@ var CONFIG = {
 La idea de **darse de baja de boletines desde Gmail con una etiqueta y Google Apps Script** viene del
 proyecto **"Gmail Unsubscribe"** de **[Amit Agarwal](https://github.com/labnol)**
 ([Digital Inspiration / labnol.org](https://www.labnol.org)), que lleva años ayudando a miles de
-personas con sus guías y scripts de Google Workspace. **¡Gracias, Amit!**
+personas con sus guías y scripts de Google Workspace. **¡Gracias, Amit!** Según su propio artículo, su versión amplía una idea anterior de **Joshua Peak**, que solo usaba la cabecera List-Unsubscribe. El proyecto original (labnol/unsubscribe-gmail) es de código abierto con licencia MIT.
 
 Este repositorio es una **reescritura independiente** (código propio, sin hoja de cálculo), no una
 copia ni un fork del original: mantiene su orden de baja (cabecera → enlace → correo) y añade modo

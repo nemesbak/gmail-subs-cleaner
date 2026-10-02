@@ -76,7 +76,7 @@ var CONFIG = {
 The idea of **unsubscribing from newsletters in Gmail through a label and Google Apps Script** comes
 from the **"Gmail Unsubscribe"** project by **[Amit Agarwal](https://github.com/labnol)**
 ([Digital Inspiration / labnol.org](https://www.labnol.org)), whose Google Workspace guides and scripts
-have helped thousands of people for years. **Thank you, Amit!**
+have helped thousands of people for years. **Thank you, Amit!** According to his own article, his version extends an earlier idea by **Joshua Peak** that only used the `List-Unsubscribe` header. The original project (`labnol/unsubscribe-gmail`) is open source under the MIT license.
 
 This repository is an **independent rewrite** (original code, no spreadsheet), not a copy or fork of
 his work: it keeps his unsubscribe order (header → link → email) and adds a dry-run mode, sender
