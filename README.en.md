@@ -1,79 +1,86 @@
 # Gmail Subs Cleaner
 
-Clean up Gmail with **one label**: anything you tag `Subs` is moved to Spam automatically every
-hour, and if it is a legitimate newsletter with a standard one-click unsubscribe, the script
-unsubscribes first. It is a [Google Apps Script](https://script.google.com) that runs in your own
-account — no servers, no dependencies.
+Clean up Gmail with **one label**: anything you tag `Subs` is unsubscribed from (when possible) and
+moved to Trash automatically every hour. It is a [Google Apps Script](https://script.google.com) that
+runs in your own account — no servers, no dependencies.
 
 > Español: see [README.md](README.md)
 
 ## What it does
 
-For every thread labelled `Subs`:
+For every thread labelled `Subs`, **like the original script did**:
 
-| Case | Action |
-| --- | --- |
-| **Spam / phishing** (the usual case) | Moves it to **Spam** and removes the label. Gmail learns from it. **It never opens links or replies.** |
-| **Legitimate newsletter** with `List-Unsubscribe` + `List-Unsubscribe-Post` headers (RFC 8058 one-click) **and** a valid DKIM signature | Sends the standard `POST` to unsubscribe, then moves it to Spam. |
+1. Tries to **unsubscribe**, in this order:
+   1. the `https` link in the `List-Unsubscribe` header (POST for RFC 8058 one-click, otherwise GET);
+   2. an "unsubscribe / opt-out" link inside the message body;
+   3. an email to the header's `mailto:` (only if the message has a valid DKIM signature).
+2. **Removes the label** and moves the thread to **Trash** (Gmail empties it after 30 days; recoverable
+   before that). If the unsubscribe fails (dead domain, invalid address) it is still cleaned up.
 
-### Why it does not "click every unsubscribe link"
-Following the unsubscribe link of a spammer confirms your address is alive and usually brings
-**more** spam. That is why only the *verifiable* one-click unsubscribe (RFC 8058 + DKIM) is used.
-Body links are never scraped and no unsubscribe emails are sent.
+Senders in `PROTECT` (default `accounts.google.com`, `groups.google.com`) are **never touched**: only
+the label is removed.
 
 ## Install (5 minutes)
 
-1. **Create the Gmail label** `Subs` (or change `LABEL` in the script).
+1. **Create the Gmail label** `Subs` (or change `LABEL`).
 2. Go to <https://script.google.com> → **New project**.
-3. Replace the contents of `Code.gs` with [`subs-cleaner.gs`](subs-cleaner.gs) and save.
-4. **Dry run first:** keep `DRY_RUN: true`, pick the `run` function and press **Run**.
+3. Replace `Code.gs` with [`subs-cleaner.gs`](subs-cleaner.gs) and save.
+4. **Dry run first:** keep `DRY_RUN: true`, pick `run` and press **Run**.
    - Google asks for permission: *Review permissions* → your account → if you see *"Google hasn't
-     verified this app"*, choose **Advanced → Go to (project) (unsafe)** → **Allow**. That is
-     expected for your own unpublished script. Read the code first if you like.
-   - Open the **Execution log**: it lists what it *would* do (`[prueba] SPAM: …`,
-     `[prueba] BAJA 1-clic: …`). Nothing is touched.
-5. **Turn it on:** set `DRY_RUN: false`, save, pick `install` and press **Run** once. This creates an
-   hourly trigger.
+     verified this app"*, choose **Advanced → Go to (project) (unsafe)** → **Allow**. Expected for your
+     own unpublished script. Read the code before authorising.
+   - Open the **Execution log**: it lists what it *would* do. Nothing is touched.
+5. **Turn it on:** set `DRY_RUN: false`, save, press **Run** on `run`, then pick `install` and run it
+   **once** to create the hourly trigger.
 6. To stop it, run `uninstall`.
 
-Each run handles up to `MAX_THREADS` (40) threads; a backlog of hundreds clears in a few hours. You can
-also run `run` manually several times.
+A run works for up to `MAX_SECONDS` (270 s); the hourly trigger finishes any backlog. When pasting into
+the editor make sure the old content is fully replaced (Ctrl+A first) so no second copy remains.
 
 ## Configuration
 
 ```js
 var CONFIG = {
   LABEL: 'Subs',      // Gmail label to process
-  DRY_RUN: true,      // true = only log what it would do
-  MAX_THREADS: 40,    // threads per run (Apps Script time limit)
-  UNSUBSCRIBE: true   // one-click unsubscribe for signed, legitimate newsletters
+  DRY_RUN: true,      // true = only log what it would do (does nothing)
+  AFTER: 'trash',     // after unsubscribing: 'trash' | 'spam' | 'archive' | 'none'
+  SAFE_ONLY: false,   // true = only unsubscribe when the message has a valid DKIM signature
+  PROTECT: ['accounts.google.com', 'groups.google.com'],  // senders that are never touched
+  MAX_SECONDS: 270,   // max time per run (Apps Script allows 360 s)
+  BATCH: 20           // threads read at a time
 };
 ```
 
-## Safety and limits
-
-- It requests access to your Gmail (modify labels / move to Spam), external requests (the one-click
-  unsubscribe) and triggers. **Review the code before authorising** — it is ~100 lines.
-- Anything moved to Spam can be recovered for 30 days.
-- Apps Script quotas: 6 min per run and 20,000 external calls per day (consumer accounts).
-- A one-click unsubscribe can confirm to a dubious sender that your address exists. Set
-  `UNSUBSCRIBE: false` to send everything straight to Spam instead.
-
 ## What to expect in the log
 
-- `[prueba] ...`: dry-run mode (`DRY_RUN: true`), nothing is touched.
+- `[prueba] …`: dry-run mode, nothing is touched.
 - `respuesta de la baja: HTTP 200`: the sender accepted the unsubscribe.
-- `respuesta de la baja: HTTP 302`: the sender redirects to a confirmation page. The script deliberately does not follow redirects, so it cannot confirm the unsubscribe; it is usually accepted. If you keep getting mail from that sender it goes to Spam anyway.
+- `respuesta de la baja: HTTP 302`: redirect to a confirmation page; usually accepted.
+- `la baja falló (…); se limpia igualmente`: non-existent domain or invalid address (typical of spam).
+- `SIN BAJA`: no unsubscribe method in the message; it is just cleaned up.
+- `Resumen: {…}`: totals for the run.
+
+## Safety and limits
+
+- It requests access to your Gmail (read, label, move, **send** the `mailto:` unsubscribe), external
+  requests (link unsubscribes) and triggers. **Review the code before authorising.**
+- **With real spam, unsubscribing can confirm your address is alive.** To be cautious set
+  `SAFE_ONLY: true` (only DKIM-signed unsubscribes) or use `AFTER: 'spam'`.
+- The `mailto:` unsubscribe is only sent to DKIM-signed senders; spam usually carries invented
+  addresses and would only bring you bounce emails.
+- Apps Script quotas: 6 min per run, 20,000 external calls per day, 100 sent emails per day
+  (consumer accounts).
 
 ## Credits and thanks
 
-The idea of **unsubscribing from newsletters in Gmail through a label and Google Apps Script**
-comes from the **"Gmail Unsubscribe"** project by **[Amit Agarwal](https://github.com/labnol)**
-([Digital Inspiration / labnol.org](https://www.labnol.org)), whose Google Workspace guides and
-scripts have helped thousands of people for years. **Thank you, Amit!**
+The idea of **unsubscribing from newsletters in Gmail through a label and Google Apps Script** comes
+from the **"Gmail Unsubscribe"** project by **[Amit Agarwal](https://github.com/labnol)**
+([Digital Inspiration / labnol.org](https://www.labnol.org)), whose Google Workspace guides and scripts
+have helped thousands of people for years. **Thank you, Amit!**
 
-This repository is an **independent rewrite** (original code, no spreadsheet, conservative handling
-of spam), not a copy or fork of his work. For the original tool, visit his site and GitHub.
+This repository is an **independent rewrite** (original code, no spreadsheet), not a copy or fork of
+his work: it keeps his unsubscribe order (header → link → email) and adds a dry-run mode, sender
+protection, failure handling and a time-budgeted loop. For the original tool, visit his site and GitHub.
 
 ## License
 
