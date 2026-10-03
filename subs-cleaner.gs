@@ -15,7 +15,7 @@
  *  1. Pega este código en un proyecto nuevo de Apps Script (script.google.com).
  *  2. Deja DRY_RUN = true y ejecuta "run": mira el Registro de ejecución (no toca nada).
  *  3. Si te gusta, pon DRY_RUN = false, ejecuta "run" y luego "install" una vez
- *     (crea un activador cada hora).
+ *     (crea un activador cada CONFIG.EVERY_MINUTES minutos).
  */
 var CONFIG = {
   LABEL: 'Subs',
@@ -24,10 +24,24 @@ var CONFIG = {
   SAFE_ONLY: false,     // true = solo da de baja si el correo trae firma DKIM válida (más prudente con spam)
   PROTECT: ['accounts.google.com', 'groups.google.com'],  // remitentes que NUNCA se tocan: solo se les quita la etiqueta
   MAX_SECONDS: 270,     // tiempo máximo por ejecución (Apps Script permite 360 s)
-  BATCH: 20             // conversaciones que se leen cada vez
+  BATCH: 20,            // conversaciones que se leen cada vez
+  EVERY_MINUTES: 15,    // frecuencia del activador (como el original: 15 min). Valores válidos: 1, 5, 10, 15, 30
+  CLEAN_BOUNCES: true   // manda a la Papelera los rebotes de los correos de baja enviados por el script
 };
 
 function run() {
+  // evita dos ejecuciones a la vez (activador + ejecución manual)
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) { Logger.log('Ya hay otra ejecución en marcha; esta se salta.'); return; }
+  try {
+    process_();
+    if (CONFIG.CLEAN_BOUNCES && !CONFIG.DRY_RUN) cleanBounces_();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function process_() {
   var label = GmailApp.getUserLabelByName(CONFIG.LABEL);
   if (!label) { Logger.log('No existe la etiqueta "%s".', CONFIG.LABEL); return; }
 
@@ -69,16 +83,17 @@ function run() {
         }
 
         if (!CONFIG.DRY_RUN) {
-          thread.removeLabel(label);
-          if (prot) { /* protegido: no se mueve, solo se quita la etiqueta */ }
-          else if (CONFIG.AFTER === 'trash') thread.moveToTrash();
-          else if (CONFIG.AFTER === 'spam') thread.moveToSpam();
-          else if (CONFIG.AFTER === 'archive') thread.moveToArchive();
+          cleanup_(thread, label, prot);
           done = true;
         }
       } catch (e) {
         stats.errores++;
         Logger.log('ERROR en un hilo: %s', e);
+        // no se pudo leer el correo: se limpia igualmente para que no se reintente cada vez
+        if (!CONFIG.DRY_RUN) {
+          try { cleanup_(thread, label, false); done = true; }
+          catch (e2) { Logger.log('  tampoco se pudo limpiar (%s); se reintentará', e2); }
+        }
       }
       if (!done) stuck++;
     }
@@ -88,11 +103,39 @@ function run() {
   Logger.log('Resumen: %s', JSON.stringify(stats));
 }
 
-/** Crea (una vez) el activador horario. Borra antes cualquier activador viejo. */
+/** Quita la etiqueta y aplica CONFIG.AFTER (los protegidos solo pierden la etiqueta). */
+function cleanup_(thread, label, prot) {
+  thread.removeLabel(label);
+  if (prot) return;
+  if (CONFIG.AFTER === 'trash') thread.moveToTrash();
+  else if (CONFIG.AFTER === 'spam') thread.moveToSpam();
+  else if (CONFIG.AFTER === 'archive') thread.moveToArchive();
+}
+
+/**
+ * Manda a la Papelera las conversaciones de correos de baja que envió el script y rebotaron
+ * ("No se ha encontrado la dirección"). Solo toca hilos ENVIADOS por ti cuyo asunto contiene
+ * "unsubscribe"/"baja" y que tienen respuesta de mailer-daemon.
+ */
+function cleanBounces_() {
+  var threads = GmailApp.search('in:sent subject:(unsubscribe OR baja) newer_than:7d', 0, 50);
+  var n = 0;
+  threads.forEach(function (t) {
+    var msgs = t.getMessages();
+    // el script envía cuerpo == asunto; así no se toca ningún correo escrito por ti
+    var first = msgs[0];
+    if (first.getPlainBody().trim() !== first.getSubject().trim()) return;
+    var bounced = msgs.some(function (m) { return /mailer-daemon|postmaster/i.test(m.getFrom()); });
+    if (bounced) { t.moveToTrash(); n++; }
+  });
+  if (n) Logger.log('Rebotes de bajas limpiados: %s', n);
+}
+
+/** Crea (una vez) el activador periódico. Borra antes cualquier activador viejo. */
 function install() {
   ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('run').timeBased().everyHours(1).create();
-  Logger.log('Activador horario creado para run().');
+  ScriptApp.newTrigger('run').timeBased().everyMinutes(CONFIG.EVERY_MINUTES).create();
+  Logger.log('Activador creado para run() cada %s minutos.', CONFIG.EVERY_MINUTES);
 }
 
 /** Quita el activador. */

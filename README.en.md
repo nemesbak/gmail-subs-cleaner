@@ -31,10 +31,10 @@ the label is removed.
      own unpublished script. Read the code before authorising.
    - Open the **Execution log**: it lists what it *would* do. Nothing is touched.
 5. **Turn it on:** set `DRY_RUN: false`, save, press **Run** on `run`, then pick `install` and run it
-   **once** to create the hourly trigger.
+   **once** to create the trigger (every 15 minutes, like the original).
 6. To stop it, run `uninstall`.
 
-A run works for up to `MAX_SECONDS` (270 s); the hourly trigger finishes any backlog. When pasting into
+A run works for up to `MAX_SECONDS` (270 s); the trigger finishes any backlog. Two runs never overlap (script lock), and a message that cannot be read is still cleaned up instead of being retried forever. When pasting into
 the editor make sure the old content is fully replaced (Ctrl+A first) so no second copy remains.
 
 ## Configuration
@@ -47,7 +47,9 @@ var CONFIG = {
   SAFE_ONLY: false,   // true = only unsubscribe when the message has a valid DKIM signature
   PROTECT: ['accounts.google.com', 'groups.google.com'],  // senders that are never touched
   MAX_SECONDS: 270,   // max time per run (Apps Script allows 360 s)
-  BATCH: 20           // threads read at a time
+  BATCH: 20,          // threads read at a time
+  EVERY_MINUTES: 15,  // trigger frequency: 1, 5, 10, 15 or 30 (run install after changing it)
+  CLEAN_BOUNCES: true // trash bounces of the unsubscribe emails sent by the script
 };
 ```
 

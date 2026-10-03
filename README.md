@@ -32,11 +32,13 @@ solo se les quita la etiqueta.
    - Mira el **Registro de ejecución**: verás qué haría con cada correo (`[prueba] BAJA (cabecera): …`,
      `[prueba] SIN BAJA: …`). No se toca nada.
 5. **Actívalo:** cambia `DRY_RUN: true` por `DRY_RUN: false`, guarda y pulsa **Ejecutar** en `run`.
-   Después elige `install` y ejecútalo **una sola vez** para crear el activador horario.
+   Después elige `install` y ejecútalo **una sola vez** para crear el activador (cada 15 minutos, como
+   el original).
 6. Para pararlo: ejecuta `uninstall`.
 
-Una pasada procesa conversaciones hasta `MAX_SECONDS` (270 s); si tienes cientos, el activador horario
-acaba el resto. Al pegar el código en el editor asegúrate de que **todo** el contenido anterior queda
+Una pasada procesa conversaciones hasta `MAX_SECONDS` (270 s); si tienes cientos, el activador acaba el
+resto. Nunca corren dos ejecuciones a la vez (candado), y un correo que no se pueda leer se limpia
+igualmente en vez de reintentarse para siempre. Al pegar el código en el editor asegúrate de que **todo** el contenido anterior queda
 sustituido (Ctrl+A antes de pegar) y no quedan dos copias.
 
 ## Configuración
@@ -49,7 +51,9 @@ var CONFIG = {
   SAFE_ONLY: false,   // true = solo da de baja si el correo trae firma DKIM válida
   PROTECT: ['accounts.google.com', 'groups.google.com'],  // remitentes que nunca se tocan
   MAX_SECONDS: 270,   // tiempo máximo por ejecución (Apps Script permite 360 s)
-  BATCH: 20           // conversaciones que se leen cada vez
+  BATCH: 20,          // conversaciones que se leen cada vez
+  EVERY_MINUTES: 15,  // frecuencia del activador: 1, 5, 10, 15 o 30 (tras cambiarlo, ejecuta install)
+  CLEAN_BOUNCES: true // manda a la Papelera los rebotes de los correos de baja que envió el script
 };
 ```
 
